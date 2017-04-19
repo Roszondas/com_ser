@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 
+
+
+#include "CServer.h"
+#include "CClient.h"
+
 using namespace std;
 
 
@@ -25,6 +30,9 @@ int main(int argc, char **argv)
 	int options;
 	extern char *optarg;
 	vector <string> pathStorage;
+	
+	CClient *Client = nullptr;
+	CServer *Server = nullptr;
 	
 	bool isClient = false;
 	bool isServer = false;
@@ -53,14 +61,41 @@ int main(int argc, char **argv)
 	}
 	
 	if(isServer){
+		try{
+			Server = new CServer(pathStorage);
+		}
+		catch(int err){
+			cerr << "Error " << err << ". Exit.\n";
+			if(Server != nullptr)
+				delete Server;
+			exit(err);
+		}
 		
+		return Server->Start();
 	}
 	else if(isClient){
 		
+		try{
+			Client = new CClient(pathStorage[0]);
+		}
+		catch(int err){
+			cerr << "Error " << err << ". Exit.\n";
+			if(Client != nullptr)
+				delete Client;
+			exit(err);
+		}
+		
+		return Client->Start();
 	}
 	else {
 		Usage(argv[0]);
 	}
-		
+	
+	if(Client != nullptr)
+		delete Client;
+	
+	if(Server != nullptr)
+		delete Server;
+	
 	return 0;
 }
