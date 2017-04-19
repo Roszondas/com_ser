@@ -6,9 +6,13 @@ OBJECTS = $(SOURCES:.cpp=.o)
 EXECUTABLE = com_server
 
 all: $(SOURCES) $(EXECUTABLE)
-	
+
 $(EXECUTABLE): $(OBJECTS) 
 	$(CC) $(OBJECTS) -o $@
+	cp $(EXECUTABLE) ../bin/
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
+
+clean:
+	rm -rf *.o $(EXECUTABLE) ../bin/$(EXECUTABLE)
