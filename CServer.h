@@ -8,6 +8,7 @@ struct PortState
 {
 	int handler;
 	int status;
+	int file = -1;
 	
 	PortState(int handler, int status){
 		this->handler = handler;
@@ -23,10 +24,10 @@ private:
 	struct termios savedOptions;
 	
 	int OpenPort(string adr);
-	int CheckReady(PortState handler);
-	int AnswerReady();
-	int RecieveData();
+	int CheckReady(PortState portState);
+	int RecieveData(PortState portState);
 	int WriteData();
+	int GetFileDescriptor();
 	
 public:
 	CServer(vector <string> portAdresses);

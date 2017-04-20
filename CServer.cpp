@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
 #define	TIMEOUT			3
 
@@ -76,9 +77,16 @@ int CServer::Start()
 {
 	int errFlag = 0;
 	
+	int fd = GetFileDescriptor();
+	
+	close (fd);
+	
 	while(!errFlag){
 		for(auto hndlr : portData){
-			errFlag = CheckReady(hndlr);
+			if(hndlr.status != READING)
+				errFlag = CheckReady(hndlr);
+			else
+				errFlag = RecieveData(hndlr);
 		}
 	}
 	
@@ -90,32 +98,81 @@ int CServer::Start()
 
 
 
-int CServer::CheckReady(PortState handler)
+int CServer::CheckReady(PortState portState)
 {
 	char buf[sizeof(COM_HNDSHAKE)];
 	
-	cout << "Scan port " << handler.handler << endl;
+	cout << "Scan port " << portState.handler << endl;
 
-	int len = read(handler.handler, buf, sizeof(buf));
+	int len = read(portState.handler, buf, sizeof(buf));
 	
 	if(len < 0)
 		cerr << "Handshake recieve error.\n";
 
-	
+	if(len > 0 && !strcmp(buf, COM_HNDSHAKE)){
+		len = 0;
+		cout << "Port " << portState.handler << " recieved handshake. Waiting for confirmation.\n";
+		
+		memset(buf, 0, sizeof(buf));
+		for(int i = 0; i < TIMEOUT; i++){
+			len = read(portState.handler, buf, sizeof(buf));
+			
+			if (len > 0)
+				break;
+			else if (len < 0)
+				cerr << "Confirmation recieve error\n";
+		}
+		
+		if(len > 0 && !strcmp(buf, COM_READY))
+			portState.status = READING;
+	}
 	
 	return 0;
 }
 
 
-int CServer::AnswerReady()
+int CServer::RecieveData(PortState portState)
 {
-	return 0;
+	char buf[sizeof(int) + 1];
+	int err = 0;
+	
+	cout << "Scan port " << portState.handler << endl;
+
+	int len = read(portState.handler, buf, sizeof(buf));
+	if (len < 0){
+		cerr << "Recieving size error\n";
+		err = errno;
+		return err;
+	}
+	
+	int msgSize = atoi(buf);
+	cout << "Ready to recieve " << msgSize << " bytes\n";
+	
+	int fd = GetFileDescriptor();
+	
+	if(fd == -1){
+		cout << "File creation failed\n";
+		err = errno;
+	}
+	else{
+		
+	}
+	
+	return err;
 }
 
 
-int CServer::RecieveData()
+int CServer::GetFileDescriptor()
 {
-	return 0;
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+
+	char name[255];
+	sprintf(name, "%d-%d-%d_%d-%d-%d.hex", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	
+	int fd = open(name, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+
+	return fd;
 }
 
 
@@ -133,6 +190,7 @@ CServer::~CServer()
 		tcsetattr(hndlr.handler, TCSANOW, &savedOptions);
 		ioctl(hndlr.handler, TIOCNXCL);
 		close(hndlr.handler);
+		close(hndlr.file);
 	}
 	
 	cout << "Done\n";

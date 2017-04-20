@@ -15,4 +15,4 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(CFLAGS) $< -o $@
 	
 clean:
-	rm -rf *.o $(EXECUTABLE) ../bin/$(EXECUTABLE)
+	rm -rf *.o *.hex $(EXECUTABLE) ../bin/$(EXECUTABLE)
