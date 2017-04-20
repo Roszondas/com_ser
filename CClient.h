@@ -8,6 +8,7 @@ class CClient
 {
 private:
 	int portHandler = -1;
+	int fileHandler = -1;
 	string filePath;
 	
 	bool isFileExist(string filePath);

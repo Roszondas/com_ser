@@ -5,13 +5,28 @@
 #include <unistd.h>
 #include <string>
 #include <vector>
-
-
+#include <errno.h>
+#include <signal.h>
 
 #include "CServer.h"
 #include "CClient.h"
 
 using namespace std;
+
+CClient *Client = nullptr;
+CServer *Server = nullptr;
+
+void sigHandler(int s){
+   printf("\nCaught signal %d\n",s);
+   
+	if(Client != nullptr)
+		delete Client;
+
+	if(Server != nullptr)
+		delete Server;
+   
+   exit(1); 
+}
 
 
 void Usage(const char *prog)
@@ -30,9 +45,17 @@ int main(int argc, char **argv)
 	int options;
 	extern char *optarg;
 	vector <string> pathStorage;
+	int err = 0;
 	
-	CClient *Client = nullptr;
-	CServer *Server = nullptr;
+	struct sigaction sigActionHandler;
+
+	sigActionHandler.sa_handler = sigHandler;
+	sigemptyset(&sigActionHandler.sa_mask);
+	sigActionHandler.sa_flags = 0;
+
+	sigaction(SIGINT, &sigActionHandler, NULL);
+	
+
 	
 	bool isClient = false;
 	bool isServer = false;
@@ -71,7 +94,7 @@ int main(int argc, char **argv)
 			exit(err);
 		}
 		
-		return Server->Start();
+		err = Server->Start();
 	}
 	else if(isClient){
 		
@@ -85,11 +108,13 @@ int main(int argc, char **argv)
 			exit(err);
 		}
 		
-		return Client->Start();
+		err = Client->Start();
 	}
 	else {
 		Usage(argv[0]);
 	}
+	
+	cout << "Bye!\n";
 	
 	if(Client != nullptr)
 		delete Client;
@@ -97,5 +122,7 @@ int main(int argc, char **argv)
 	if(Server != nullptr)
 		delete Server;
 	
-	return 0;
+	cerr << err << endl;
+	cerr << errno << endl;
+	return err;
 }
