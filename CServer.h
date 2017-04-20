@@ -24,8 +24,8 @@ private:
 	struct termios savedOptions;
 	
 	int OpenPort(string adr);
-	int CheckReady(PortState portState);
-	int RecieveData(PortState portState);
+	int CheckReady(PortState &portState);
+	int RecieveData(PortState &portState);
 	int WriteData(PortState portState, int size);
 	int GetFileDescriptor();
 	

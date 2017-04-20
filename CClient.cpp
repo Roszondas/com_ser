@@ -73,6 +73,7 @@ int CClient::FindFreePort()
 	options.c_cflag |= CS8;
 	options.c_cflag &= ~(PARENB | PARODD);
 	options.c_cflag |= (CLOCAL | CREAD);
+	options.c_iflag &= ~IGNBRK;
 	options.c_cc[VMIN]  = 0;
 	options.c_cc[VTIME] = 5;
 	
@@ -100,6 +101,7 @@ int CClient::FindFreePort()
 			cerr << "Handshake recieve error.\n";
 	}
 	
+	cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE << endl;
 	if(!strcmp(buf, COM_HNDSHAKE))
 		cout << "Server found\n";
 	else
@@ -123,7 +125,7 @@ int CClient::SendReady()
 {
 	int len = write(portHandler, COM_READY, sizeof(COM_READY));
     if (len != sizeof(COM_READY)) {
-		printf("Writing error: %d: %s\n", len, strerror(errno));
+		cerr << "Writing failed\n";
     }
     tcdrain(portHandler);
 	
@@ -160,6 +162,32 @@ int CClient::WaitReady()
 
 int CClient::SendData()
 {
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	
+	char name[255];
+	sprintf(name, "%d hours, %d minutes, %d seconds\n", tm.tm_hour, tm.tm_min, tm.tm_sec);
+	
+	int strLen = 0;
+	
+	for(;;strLen++){
+		if(name[strLen] == '\n') break;
+	}
+	
+	char buf[sizeof(int)];
+	
+	strLen += 1;
+	
+	sprintf(buf, "%i", strLen);
+	
+	cout << "Sending " << strLen << " bytes\n";
+	
+	int len = write(portHandler, buf, sizeof(buf));
+	cout << "Sent " << len << " bytes as size\n";
+	len = write(portHandler, name, strLen);
+	cout << "Sent " << len << " bytes of data\n";
+	tcdrain(portHandler);
+	
 	return 0;
 }
 
