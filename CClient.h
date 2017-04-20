@@ -1,5 +1,5 @@
 #include <string>
-
+#include <termios.h>
 
 
 using namespace std;
@@ -10,6 +10,7 @@ private:
 	int portHandler = -1;
 	int fileHandler = -1;
 	string filePath;
+	struct termios savedOptions;
 	
 	bool isFileExist(string filePath);
 	int FindFreePort();

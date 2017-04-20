@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
@@ -65,6 +64,7 @@ int CClient::FindFreePort()
 	
 	struct termios options;
 	tcgetattr(handler, &options);
+	savedOptions = options;
 	
 	cfsetispeed(&options, B19200);
 	cfsetospeed(&options, B19200);
@@ -169,6 +169,7 @@ CClient::~CClient()
 	cout << "Close handlers\n";
 	if(portHandler != -1){
 		cout << "Closing port " << portHandler << "...\n";
+		tcsetattr(portHandler, TCSANOW, &savedOptions);
 		ioctl(portHandler, TIOCNXCL);
 		close (portHandler);
 	}
