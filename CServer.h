@@ -26,7 +26,7 @@ private:
 	int OpenPort(string adr);
 	int CheckReady(PortState portState);
 	int RecieveData(PortState portState);
-	int WriteData();
+	int WriteData(PortState portState, int size);
 	int GetFileDescriptor();
 	
 public:

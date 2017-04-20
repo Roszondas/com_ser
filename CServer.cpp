@@ -76,11 +76,7 @@ int CServer::OpenPort(string adr)
 int CServer::Start()
 {
 	int errFlag = 0;
-	
-	int fd = GetFileDescriptor();
-	
-	close (fd);
-	
+
 	while(!errFlag){
 		for(auto hndlr : portData){
 			if(hndlr.status != READING)
@@ -93,9 +89,6 @@ int CServer::Start()
 	return 0;
 	
 }
-
-
-
 
 
 int CServer::CheckReady(PortState portState)
@@ -148,14 +141,16 @@ int CServer::RecieveData(PortState portState)
 	int msgSize = atoi(buf);
 	cout << "Ready to recieve " << msgSize << " bytes\n";
 	
-	int fd = GetFileDescriptor();
+	portState.file = GetFileDescriptor();
 	
-	if(fd == -1){
+	if(portState.file == -1){
 		cout << "File creation failed\n";
 		err = errno;
 	}
 	else{
-		
+		err = WriteData(portState, msgSize);
+		close(portState.file);
+		portState.status = WAITING;
 	}
 	
 	return err;
@@ -176,9 +171,29 @@ int CServer::GetFileDescriptor()
 }
 
 
-int CServer::WriteData()
+int CServer::WriteData(PortState portState, int size)
 {
-	return 0;
+	char *buf = new char[size];
+	int err = 0;
+	int len = 0;
+	
+	while(len < size){
+		len += read(portState.handler, buf, sizeof(buf));
+		if (len < 0){
+			cerr << "Recieving data error\n";
+			err = errno;
+			return err;
+		}
+	
+		int wlen = write(portState.file, buf, len);
+		if (wlen < 0){
+			cerr << "Writting data error\n";
+			err = errno;
+			return err;
+		}
+	}
+	
+	return err;
 }
 
 
