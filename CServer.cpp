@@ -39,7 +39,7 @@ int CServer::OpenPort(string adr)
 	
 	cout << "Establishing server\n";
 	
-	handler = open("/dev/pts/3", O_RDWR | O_NOCTTY );
+	handler = open(adr.c_str(), O_RDWR | O_NOCTTY );
 	if (handler == -1) {
 		cerr << "Error opening port\n";
 		return errno;

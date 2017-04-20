@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
+#include <sys/types.h>
+#include <vector>
 
 #define	TIMEOUT			3
 
@@ -16,6 +18,9 @@
 #define COM_READY		"325\n"
 
 using namespace std;
+
+vector <string> portList {"/dev/pts/5", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
+//vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
 
 CClient::CClient(string filePath)
 {
@@ -27,6 +32,11 @@ CClient::CClient(string filePath)
 
 bool CClient::isFileExist(string filePath)
 {
+	fileHandler = open(filePath.c_str(), O_RDONLY);
+	if(fileHandler < 0){
+		cerr << "Failed to open file.";
+		return false;
+	}
 	return true;
 }
 
@@ -51,61 +61,74 @@ int CClient::FindFreePort()
 {
 	int handler = -1;
 	
-	handler = open("/dev/pts/2", O_RDWR | O_NOCTTY );
-	if (handler == -1) {
-		cerr << "Error opening port\n";
-		return errno;
-	}
-	
-	if (ioctl(handler, TIOCEXCL)) {
-		cerr << "Port is busy\n";
-		return errno;
-    }
-	
-	struct termios options;
-	tcgetattr(handler, &options);
-	savedOptions = options;
-	
-	cfsetispeed(&options, B19200);
-	cfsetospeed(&options, B19200);
-	
-	options.c_cflag &= ~CSIZE;
-	options.c_cflag |= CS8;
-	options.c_cflag &= ~(PARENB | PARODD);
-	options.c_cflag |= (CLOCAL | CREAD);
-	options.c_iflag &= ~IGNBRK;
-	options.c_cc[VMIN]  = 0;
-	options.c_cc[VTIME] = 5;
-	
-	cout << "Trying to find server\n";
-	
-	if( tcsetattr(handler, TCSANOW, &options) != 0){
-		cerr << "Error writing port options\n";
-		return -1;
-	}
+	for(int index = 0; index < portList.size(); index++){
+		handler = open(portList[index].c_str(), O_RDWR | O_NOCTTY );
+		if (handler == -1) {
+			cerr << "Error opening port " << index << endl;
+			//return errno;
+			continue;
+		}
 		
-	int len = write(handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
-    if (len != sizeof(COM_HNDSHAKE)) {
-        cerr << "Handshake send error.\n";
-    }
-    tcdrain(handler);
-	
-	char buf[sizeof(COM_HNDSHAKE)];
-	
-	for(int i = 0; i < TIMEOUT; i++){
-		cout << "Scaning\n";
-		len = read(handler, buf, sizeof(buf));
-		if(len > 0)
+		if (ioctl(handler, TIOCEXCL)) {
+			cerr << "Port is busy\n";
+			//return errno;
+			continue;
+		}
+		
+		struct termios options;
+		tcgetattr(handler, &options);
+		savedOptions = options;
+		
+		cfsetispeed(&options, B19200);
+		cfsetospeed(&options, B19200);
+		
+		options.c_cflag &= ~CSIZE;
+		options.c_cflag |= CS8;
+		options.c_cflag &= ~(PARENB | PARODD);
+		options.c_cflag |= (CLOCAL | CREAD);
+		options.c_iflag &= ~IGNBRK;
+		options.c_iflag &= ~O_NONBLOCK ;
+		options.c_cc[VMIN]  = 0;
+		options.c_cc[VTIME] = 5;
+		
+		cout << "Trying to find server\n";
+		
+		if( tcsetattr(handler, TCSANOW, &options) != 0){
+			cerr << "Error writing port options\n";
+			return -1;
+		}
+		
+		int len = write(handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
+		if (len != sizeof(COM_HNDSHAKE)) {
+			cerr << "Handshake send error.\n";
+		}
+		tcdrain(handler);
+		
+		char buf[sizeof(COM_HNDSHAKE)];
+		
+		for(int i = 0; i < TIMEOUT; i++){
+			cout << "Scaning\n";
+			len = read(handler, buf, sizeof(buf));
+			if(len > 0)
+				break;
+			else if(len < 0)
+				cerr << "Handshake recieve error.\n";
+		}
+		
+		cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE << endl;
+		if(!strcmp(buf, COM_HNDSHAKE)){
+			cout << "Server found\n";
+			errno = 0;
 			break;
-		else if(len < 0)
-			cerr << "Handshake recieve error.\n";
+		}
+		else {
+			cout << "Server not found at " << handler << ". Check next port\n";
+			tcsetattr(handler, TCSANOW, &savedOptions);
+			ioctl(handler, TIOCNXCL);
+			close (handler);
+			handler = -1;
+		}
 	}
-	
-	cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE << endl;
-	if(!strcmp(buf, COM_HNDSHAKE))
-		cout << "Server found\n";
-	else
-		cout << "There will be searching for other port\n";
 	
 	return handler;
 }
@@ -162,17 +185,17 @@ int CClient::WaitReady()
 
 int CClient::SendData()
 {
-	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
-	
 	char name[255];
-	sprintf(name, "%d hours, %d minutes, %d seconds\n", tm.tm_hour, tm.tm_min, tm.tm_sec);
-	
+
+	int wlen = 0;
+		
 	int strLen = 0;
+	char pit[] = "/dev/null";
+	while(wlen = read(fileHandler, pit, 1) > 0)
+		strLen++;
 	
-	for(;;strLen++){
-		if(name[strLen] == '\n') break;
-	}
+	lseek(fileHandler, 0, SEEK_SET);
+
 	
 	char buf[sizeof(int)];
 	
@@ -184,7 +207,10 @@ int CClient::SendData()
 	
 	int len = write(portHandler, buf, sizeof(buf));
 	cout << "Sent " << len << " bytes as size\n";
-	len = write(portHandler, name, strLen);
+	
+	while(wlen = read(fileHandler, name, 1) > 0){
+		len = write(portHandler, name, 1);
+	}
 	cout << "Sent " << len << " bytes of data\n";
 	tcdrain(portHandler);
 	
