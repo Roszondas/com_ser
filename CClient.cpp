@@ -191,16 +191,25 @@ int CClient::SendData()
 		
 	int strLen = 0;
 	char pit[] = "/dev/null";
-	while(wlen = read(fileHandler, pit, 1) > 0)
-		strLen++;
 	
+	cout << "Checking input file size.\n";
+	
+	int chk = 0;
+	char rd;
+	while(wlen = read(fileHandler, &rd, 1) > 0){
+		cout << rd;
+		//cout << chk++ << " bytes checked\n";
+		strLen++;
+	}
+	
+	cout << "lseek\n";
 	lseek(fileHandler, 0, SEEK_SET);
 
+	cout << "buf\n";
+	char buf[sizeof(int) + 1];
 	
-	char buf[sizeof(int)];
-	
-	strLen += 1;
-	
+	//strLen += 1;
+	cout << "sprintf\n";
 	sprintf(buf, "%i", strLen);
 	
 	cout << "Sending " << strLen << " bytes\n";
@@ -208,8 +217,9 @@ int CClient::SendData()
 	int len = write(portHandler, buf, sizeof(buf));
 	cout << "Sent " << len << " bytes as size\n";
 	
+	len = 0;
 	while(wlen = read(fileHandler, name, 1) > 0){
-		len = write(portHandler, name, 1);
+		len += write(portHandler, name, 1);
 	}
 	cout << "Sent " << len << " bytes of data\n";
 	tcdrain(portHandler);

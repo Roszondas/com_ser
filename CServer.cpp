@@ -142,7 +142,7 @@ int CServer::CheckReady(PortState &portState)
 
 int CServer::RecieveData(PortState &portState)
 {
-	char buf[sizeof(int)];
+	char buf[sizeof(int) + 1];
 	memset(buf, 0, sizeof(buf));
 	int err = 0;
 	
@@ -195,22 +195,24 @@ int CServer::GetFileDescriptor()
 
 int CServer::WriteData(PortState portState, int size)
 {
-	char *buf = new char[size];
+	//char *buf = new char[size];
+	char buf;
 	int err = 0;
 	int len = 0;
 	
+	cout << "Reading data.\n";
 	while(len < size){
-		len += read(portState.handler, buf, size);
+		len += read(portState.handler, &buf, 1);
 		if (len < 0){
 			cerr << "Recieving data error\n";
 			err = errno;
 			return err;
 		}
 	
-		cout << "Read " << len << " bytes\n";
-		cout << "Data: " << buf << endl;
+		//cout << "Read " << len << " bytes\n";
+		//cout << "Data: " << buf << endl;
 	
-		int wlen = write(portState.file, buf, len);
+		int wlen = write(portState.file, &buf, 1);
 		if (wlen < 0){
 			cerr << "Writting data error\n";
 			err = errno;
