@@ -25,12 +25,16 @@ private:
 	int FindServer();
 	int TryHandshake();
 	bool isFileExist(string filePath);
-	int Transmit();
 	int SendReady();
 	int WaitReady();
 	int SendData();
 	
 	int Write(const void *buf, size_t nbyte);
+	int Read(void *buf, size_t nbyte);
+	
+	int WriteFile(const void *buf, size_t nbyte);
+	int ReadFile(void *buf, size_t nbyte);
+	int FileSize();
 	
 public:
 	CClient(string filePath, int protocol);
