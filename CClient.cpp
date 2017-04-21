@@ -45,7 +45,12 @@ bool CClient::isFileExist(string filePath)
 
 int CClient::Start()
 {
-	portHandler = Interface->FindServer();
+	//portHandler = Interface->FindServer();
+	
+	if(FindServer())
+		portHandler = Interface->ReturnPort();
+	else
+		return -1;
 	
 	cout << "Start " << portHandler << endl;
 	
@@ -56,6 +61,42 @@ int CClient::Start()
 	cout << "Start exiting " << portHandler << endl;
 	
 	return res;
+}
+
+
+int CClient::FindServer()
+{
+	for(unsigned int index = 0; index < portList.size(); index++){
+		if(Interface->OpenPort(portList[index])){
+			if(TryHandshake())
+				return 1;
+		}
+	}
+	
+	return 0;
+}
+
+
+int CClient::TryHandshake()
+{
+	int size = sizeof(COM_HNDSHAKE);
+	char buf[size];
+		
+	Interface->doWrite(COM_HNDSHAKE, size);
+
+	for(int i = 0; i < TIMEOUT; i++){
+		cout << "Scaning\n";
+		if(Interface->doRead(buf, size))
+			break;
+		else
+			return 0;
+	
+	}
+	
+	if(!strcmp(buf, COM_HNDSHAKE))
+		return 1;
+
+	return 0;
 }
 
 
@@ -71,6 +112,8 @@ int CClient::Transmit()
 
 int CClient::SendReady()
 {
+	cout << "SendReady " << portHandler << endl;
+	
 	int len = write(portHandler, COM_READY, sizeof(COM_READY));
     if (len != sizeof(COM_READY)) {
 		cerr << "Writing failed\n";

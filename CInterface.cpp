@@ -21,87 +21,25 @@ vector <string> portListInterface {"/dev/pts/5", "/dev/pts/2", "/dev/pts/3", "/d
 CInterface::~CInterface() {};
 
 
-int CComInterface::FindServer()
+int CComInterface::OpenPort(string port)
 {
-	int handler = -1;
+	ClosePort();
+	
+	portHandler = open(port.c_str(), O_RDWR | O_NOCTTY );
 
-	for(unsigned int index = 0; index < portListInterface.size(); index++){
-		handler = OpenPort(portListInterface[index]);
-		if(handler != -1) {
-			if(TryHandshake(handler) == -1)
-				ClosePort(handler);
-			else
-				break;
-		}
-	}
-
-	portHandler = handler;
-	
-	return handler;
-}
-
-
-int CComInterface::TryHandshake(int handler)
-{
-	cout << "Trying to find server\n";
-	
-	int len = write(handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
-	if (len != sizeof(COM_HNDSHAKE)) {
-		cerr << "Handshake send error.\n";
-	}
-	
-	char buf[sizeof(COM_HNDSHAKE)];
-	
-	for(int i = 0; i < TIMEOUT; i++){
-		cout << "Scaning\n";
-		len = read(handler, buf, sizeof(buf));
-		
-		if(len > 0)
-			break;
-		
-		if(len < 0){
-			cerr << "Handshake recieve error.\n";
-			return -1;
-		}
-	}
-	
-	cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE << endl;
-	
-	if(!strcmp(buf, COM_HNDSHAKE)){
-		cout << "Server found\n";
-		errno = 0;
+	if (portHandler == -1) {
+		cerr << "Error opening port " << port << endl;
 		return 0;
 	}
 	
-	cout << "Server not found at " << handler << ". Check next port\n";
-	
-	return -1;
-}
-
-
-int CComInterface::OpenPort(string port)
-{
-	cout << "OpenPort() in\n";
-	int handler = -1;
-	
-	handler = open(port.c_str(), O_RDWR | O_NOCTTY );
-	
-	cout << "OpenPort() open\n";
-	
-	if (handler == -1) {
-		cerr << "Error opening port " << port << endl;
-		return -1;
-	}
-	
-	if (ioctl(handler, TIOCEXCL)) {
+	if (ioctl(portHandler, TIOCEXCL)) {
 		cerr << "Port is busy\n";
-		return -1;
+		close (portHandler);
+		return 0;
 	}
-	
-	cout << "OpenPort() termios\n";
 	
 	struct termios options;
-	tcgetattr(handler, &options);
+	tcgetattr(portHandler, &options);
 	savedOptions = options;
 	
 	cfsetispeed(&options, B19200);
@@ -116,34 +54,57 @@ int CComInterface::OpenPort(string port)
 	options.c_cc[VMIN]  = 0;
 	options.c_cc[VTIME] = 5;
 	
-	
-	
-	if( tcsetattr(handler, TCSANOW, &options) != 0){
+	if( tcsetattr(portHandler, TCSANOW, &options) != 0){
 		cerr << "Error writing port options\n";
-		return -1;
+		ioctl(portHandler, TIOCNXCL);
+		close (portHandler);
+		return 0;
 	}
 	
-	return handler;
+	cout << "Port open: " << portHandler << " " << port << endl;
+	
+	return 1;
 }
 
 
-void CComInterface::ClosePort(int handler){
-	if(handler < 0) return;
+void CComInterface::ClosePort(){
+	if(portHandler < 0) return;
 	
-	tcsetattr(handler, TCSANOW, &savedOptions);
-	ioctl(handler, TIOCNXCL);
-	close (handler);
+	tcsetattr(portHandler, TCSANOW, &savedOptions);
+	ioctl(portHandler, TIOCNXCL);
+	close (portHandler);
 }
 
 
 int CComInterface::doWrite(const void *buf, size_t nbyte) 
 {
-	return 0;
+	cout << "Write to " << portHandler << " Len " << nbyte << endl;
+	int len = write(portHandler, buf, nbyte);
+	if (len < 0) {
+		cerr << "Write error.\n";
+		return 0;
+	}
+	cout << "Actual len " << len << endl;
+	return len;
+}
+
+
+int CComInterface::doRead(void *buf, size_t nbyte) 
+{
+	cout << "Read from " << portHandler << " Len " << nbyte << endl;
+	int len = read(portHandler, buf, nbyte);
+	if (len < 0) {
+		cerr << "Read error.\n";
+		return 0;
+	}
+	
+	cout << "Actual len " << len << endl;
+	return len;
 }
 
 
 CComInterface::~CComInterface()
 {
 	cout << "Closing port " << portHandler << "...\n";
-	ClosePort(portHandler);
+	ClosePort();
 }

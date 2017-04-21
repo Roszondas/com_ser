@@ -22,6 +22,8 @@ private:
 	struct termios savedOptions;
 	CInterface *Interface = nullptr;
 	
+	int FindServer();
+	int TryHandshake();
 	bool isFileExist(string filePath);
 	int Transmit();
 	int SendReady();
