@@ -8,6 +8,11 @@
 #include <errno.h>
 #include <signal.h>
 
+#ifndef COMMONH
+#include "Common.h"
+#define COMMONH
+#endif
+
 #include "CServer.h"
 #include "CClient.h"
 
@@ -99,7 +104,7 @@ int main(int argc, char **argv)
 	else if(isClient){
 		
 		try{
-			Client = new CClient(pathStorage[0]);
+			Client = new CClient(pathStorage[0], INTRFCE_COM);
 		}
 		catch(int err){
 			cerr << "Error " << err << ". Exit.\n";

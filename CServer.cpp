@@ -6,12 +6,8 @@
 #include <sys/ioctl.h>
 #include <string.h>
 
-#define	TIMEOUT			3
 
-#define COM_HNDSHAKE	"787\n"
-#define COM_READY		"325\n"
 
-enum port_state {WAITING, HNDSHAKED, READING};
 
 CServer::CServer(vector <string> portAdresses)
 {

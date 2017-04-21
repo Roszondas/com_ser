@@ -1,3 +1,8 @@
+#ifndef COMMONH
+#include "Common.h"
+#define COMMONH
+#endif
+
 #include <string>
 #include <vector>
 #include <termios.h>

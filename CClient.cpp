@@ -12,21 +12,23 @@
 #include <sys/types.h>
 #include <vector>
 
-#define	TIMEOUT			3
-
-#define COM_HNDSHAKE	"787\n"
-#define COM_READY		"325\n"
-
 using namespace std;
 
 vector <string> portList {"/dev/pts/5", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
 //vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
 
-CClient::CClient(string filePath)
+
+CClient::CClient(string filePath, int protocol)
 {
 	if(!isFileExist(filePath))
 		throw ENOENT;
 	this->filePath = filePath;
+	
+	switch(protocol){
+		case INTRFCE_COM:
+		default:
+			Interface = new CComInterface;
+	}
 }
 
 
@@ -43,7 +45,7 @@ bool CClient::isFileExist(string filePath)
 
 int CClient::Start()
 {
-	portHandler = FindFreePort();
+	portHandler = Interface->FindServer();
 	
 	cout << "Start " << portHandler << endl;
 	
@@ -54,83 +56,6 @@ int CClient::Start()
 	cout << "Start exiting " << portHandler << endl;
 	
 	return res;
-}
-
-
-int CClient::FindFreePort()
-{
-	int handler = -1;
-	
-	for(int index = 0; index < portList.size(); index++){
-		handler = open(portList[index].c_str(), O_RDWR | O_NOCTTY );
-		if (handler == -1) {
-			cerr << "Error opening port " << index << endl;
-			//return errno;
-			continue;
-		}
-		
-		if (ioctl(handler, TIOCEXCL)) {
-			cerr << "Port is busy\n";
-			//return errno;
-			continue;
-		}
-		
-		struct termios options;
-		tcgetattr(handler, &options);
-		savedOptions = options;
-		
-		cfsetispeed(&options, B19200);
-		cfsetospeed(&options, B19200);
-		
-		options.c_cflag &= ~CSIZE;
-		options.c_cflag |= CS8;
-		options.c_cflag &= ~(PARENB | PARODD);
-		options.c_cflag |= (CLOCAL | CREAD);
-		options.c_iflag &= ~IGNBRK;
-		options.c_iflag &= ~O_NONBLOCK ;
-		options.c_cc[VMIN]  = 0;
-		options.c_cc[VTIME] = 5;
-		
-		cout << "Trying to find server\n";
-		
-		if( tcsetattr(handler, TCSANOW, &options) != 0){
-			cerr << "Error writing port options\n";
-			return -1;
-		}
-		
-		int len = write(handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
-		if (len != sizeof(COM_HNDSHAKE)) {
-			cerr << "Handshake send error.\n";
-		}
-		tcdrain(handler);
-		
-		char buf[sizeof(COM_HNDSHAKE)];
-		
-		for(int i = 0; i < TIMEOUT; i++){
-			cout << "Scaning\n";
-			len = read(handler, buf, sizeof(buf));
-			if(len > 0)
-				break;
-			else if(len < 0)
-				cerr << "Handshake recieve error.\n";
-		}
-		
-		cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE << endl;
-		if(!strcmp(buf, COM_HNDSHAKE)){
-			cout << "Server found\n";
-			errno = 0;
-			break;
-		}
-		else {
-			cout << "Server not found at " << handler << ". Check next port\n";
-			tcsetattr(handler, TCSANOW, &savedOptions);
-			ioctl(handler, TIOCNXCL);
-			close (handler);
-			handler = -1;
-		}
-	}
-	
-	return handler;
 }
 
 
@@ -153,6 +78,12 @@ int CClient::SendReady()
     tcdrain(portHandler);
 	
 	return 0;
+}
+
+
+int CClient::Write(const void *buf, size_t nbyte)
+{
+	return Interface->doWrite(buf, nbyte);
 }
 
 
@@ -186,30 +117,29 @@ int CClient::WaitReady()
 int CClient::SendData()
 {
 	char name[255];
-
-	int wlen = 0;
-		
+	
 	int strLen = 0;
-	char pit[] = "/dev/null";
 	
 	cout << "Checking input file size.\n";
 	
-	int chk = 0;
+	//int chk = 0;
 	char rd;
-	while(wlen = read(fileHandler, &rd, 1) > 0){
-		cout << rd;
+	
+	while(read(fileHandler, &rd, 1) > 0){
+		//cout << rd;
 		//cout << chk++ << " bytes checked\n";
 		strLen++;
 	}
 	
-	cout << "lseek\n";
+	//cout << "lseek\n";
 	lseek(fileHandler, 0, SEEK_SET);
 
-	cout << "buf\n";
+	//cout << "buf\n";
 	char buf[sizeof(int) + 1];
 	
 	//strLen += 1;
-	cout << "sprintf\n";
+	//cout << "sprintf\n";
+	
 	sprintf(buf, "%i", strLen);
 	
 	cout << "Sending " << strLen << " bytes\n";
@@ -218,7 +148,7 @@ int CClient::SendData()
 	cout << "Sent " << len << " bytes as size\n";
 	
 	len = 0;
-	while(wlen = read(fileHandler, name, 1) > 0){
+	while(read(fileHandler, name, 1) > 0){
 		len += write(portHandler, name, 1);
 	}
 	cout << "Sent " << len << " bytes of data\n";
@@ -242,5 +172,9 @@ CClient::~CClient()
 		cout << "Closing file " << fileHandler << "...\n";
 		close (fileHandler);
 	}
+	
+	if(Interface != nullptr)
+		delete Interface;
+	
 	cout << "Done\n";
 }

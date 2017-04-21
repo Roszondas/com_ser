@@ -1,6 +1,15 @@
+#ifndef COMMONH
+#include "Common.h"
+#define COMMONH
+#endif
+
 #include <string>
 #include <termios.h>
 
+#ifndef CINTERFASEH 
+#include "CInterface.h"
+#define CINTERFASEH 
+#endif
 
 using namespace std;
 
@@ -11,16 +20,18 @@ private:
 	int fileHandler = -1;
 	string filePath;
 	struct termios savedOptions;
+	CInterface *Interface = nullptr;
 	
 	bool isFileExist(string filePath);
-	int FindFreePort();
 	int Transmit();
 	int SendReady();
 	int WaitReady();
 	int SendData();
 	
+	int Write(const void *buf, size_t nbyte);
+	
 public:
-	CClient(string filePath);
+	CClient(string filePath, int protocol);
 	~CClient();
 	int Start();
 };
