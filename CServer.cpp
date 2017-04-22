@@ -8,65 +8,27 @@
 
 
 
-
-CServer::CServer(vector <string> portAdresses)
+CServer::CServer(vector <string> portAdresses, int protocol)
 {
 	cout << "CServer\n";
 	
-	for(auto &adr : portAdresses){
-		int handler = OpenPort(adr);
-		if(handler == -1){
-			cerr << "Can't open port " << adr << endl;
-			continue;
+	for(unsigned int index = 0; index < portAdresses.size(); index++){
+		CInterface *Interface;
+		switch(protocol){
+			case INTRFCE_COM:
+			default:
+				Interface = new CComInterface;
 		}
-		portData.push_back(PortState(handler, WAITING));
+		
+		if(Interface->OpenPort(portAdresses[index])){
+			channelData.push_back(ChannelState(Interface, WAITING));
+		}
 	}
 	
-	if(portData.empty()){
+	if(channelData.empty()){
 		cerr << "There is no working port\n";
 		throw ENXIO;
 	}
-}
-
-
-int CServer::OpenPort(string adr)
-{
-	int handler = -1;
-	
-	cout << "Establishing server\n";
-	
-	handler = open(adr.c_str(), O_RDWR | O_NOCTTY );
-	if (handler == -1) {
-		cerr << "Error opening port\n";
-		return errno;
-	}
-	
-	if (ioctl(handler, TIOCEXCL)) {
-		cerr << "Port is busy\n";
-		return errno;
-    }
-	
-	struct termios options;
-	tcgetattr(handler, &options);
-	savedOptions = options;
-	
-	cfsetispeed(&options, B19200);
-	cfsetospeed(&options, B19200);
-	
-	options.c_cflag &= ~CSIZE;
-	options.c_cflag |= CS8;
-	options.c_cflag &= ~(PARENB | PARODD);
-	options.c_cflag |= (CLOCAL | CREAD);
-	options.c_iflag &= ~IGNBRK;
-	options.c_cc[VMIN]  = 0;
-	options.c_cc[VTIME] = 5;
-	
-	if( tcsetattr(handler, TCSANOW, &options) != 0){
-		cerr << "Error writing port options\n";
-		return -1;
-	}
-		
-	return handler;
 }
 
 
@@ -75,37 +37,37 @@ int CServer::Start()
 	int errFlag = 0;
 
 	while(!errFlag){
-		for(auto &hndlr : portData){
-			if(hndlr.status != READING){
-				errFlag = CheckReady(hndlr);
-			}
-			else{
-				errFlag = RecieveData(hndlr);
+		for(auto &hndlr : channelData){
+			actualChannel = &hndlr;
+			switch(hndlr.status){
+				case READING:	errFlag = RecieveData();
+				case WAITING:
+				case HNDSHAKED:	
+				default:		errFlag = CheckReady(hndlr);
 			}
 		}
 	}
 	
-	return 0;
-	
+	return errFlag;
 }
 
 
-int CServer::CheckReady(PortState &portState)
+int CServer::CheckReady(ChannelState &channelState)
 {
 	char buf[sizeof(COM_HNDSHAKE)];
 	
-	cout << "Scan port " << portState.handler << endl;
+	cout << "Scan port " << channelState.handler << endl;
 
-	int len = read(portState.handler, buf, sizeof(buf));
+	int len = read(channelState.handler, buf, sizeof(buf));
 	
 	if(len < 0)
 		cerr << "Handshake recieve error.\n";
 
 	if(len > 0 && !strcmp(buf, COM_HNDSHAKE)){
 		len = 0;
-		cout << "Port " << portState.handler << " recieved handshake. Waiting for confirmation.\n";
+		cout << "Port " << channelState.handler << " recieved handshake. Waiting for confirmation.\n";
 		
-		len = write(portState.handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
+		len = write(channelState.handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
 		if (len != sizeof(COM_HNDSHAKE)) {
 			cerr << "Writing confirm ready failed\n";
 		}
@@ -114,7 +76,7 @@ int CServer::CheckReady(PortState &portState)
 	
 		memset(buf, 0, sizeof(buf));
 		for(int i = 0; i < TIMEOUT; i++){
-			len = read(portState.handler, buf, sizeof(buf));
+			len = read(channelState.handler, buf, sizeof(buf));
 			
 			if (len > 0)
 				break;
@@ -123,12 +85,12 @@ int CServer::CheckReady(PortState &portState)
 		}
 		cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
 		if(len > 0 && !strcmp(buf, COM_READY)){
-			len = write(portState.handler, COM_READY, sizeof(COM_READY));
+			len = write(channelState.handler, COM_READY, sizeof(COM_READY));
 			if (len != sizeof(COM_READY)) {
 				cerr << "Writing ready signal failed\n";
 			}
-			portState.status = READING;
-			cout << "Confirmation recieved. Ready to write data. Status " << portState.status << endl;
+			channelState.status = READING;
+			cout << "Confirmation recieved. Ready to write data. Status " << channelState.status << endl;
 		}
 	}
 	
@@ -136,18 +98,20 @@ int CServer::CheckReady(PortState &portState)
 }
 
 
-int CServer::RecieveData(PortState &portState)
+int CServer::RecieveData()
 {
+	ChannelState *channelState = actualChannel;
+	
 	char buf[sizeof(int) + 1];
 	memset(buf, 0, sizeof(buf));
 	int err = 0;
 	
-	cout << "Waiting data " << portState.handler << endl;
+	cout << "Waiting data " << channelState->handler << endl;
 	
 	int len = 0;
 	
 	while(len < sizeof(buf)){
-		len += read(portState.handler, buf, sizeof(buf));
+		len += read(channelState->handler, buf, sizeof(buf));
 		if (len < 0){
 			cerr << "Recieving size error\n";
 			err = errno;
@@ -159,16 +123,16 @@ int CServer::RecieveData(PortState &portState)
 	int msgSize = atoi(buf);
 	cout << "Ready to recieve " << msgSize << " bytes\n";
 	
-	portState.file = GetFileDescriptor();
+	channelState->file = GetFileDescriptor();
 	
-	if(portState.file == -1){
+	if(channelState->file == -1){
 		cout << "File creation failed\n";
 		err = errno;
 	}
 	else{
-		err = WriteData(portState, msgSize);
-		close(portState.file);
-		portState.status = WAITING;
+		err = WriteData(*channelState, msgSize);
+		close(channelState->file);
+		channelState->status = WAITING;
 	}
 	
 	return err;
@@ -189,7 +153,7 @@ int CServer::GetFileDescriptor()
 }
 
 
-int CServer::WriteData(PortState portState, int size)
+int CServer::WriteData(ChannelState channelState, int size)
 {
 	//char *buf = new char[size];
 	char buf;
@@ -198,7 +162,7 @@ int CServer::WriteData(PortState portState, int size)
 	
 	cout << "Reading data.\n";
 	while(len < size){
-		len += read(portState.handler, &buf, 1);
+		len += read(channelState.handler, &buf, 1);
 		if (len < 0){
 			cerr << "Recieving data error\n";
 			err = errno;
@@ -208,7 +172,7 @@ int CServer::WriteData(PortState portState, int size)
 		//cout << "Read " << len << " bytes\n";
 		//cout << "Data: " << buf << endl;
 	
-		int wlen = write(portState.file, &buf, 1);
+		int wlen = write(channelState.file, &buf, 1);
 		if (wlen < 0){
 			cerr << "Writting data error\n";
 			err = errno;
@@ -222,14 +186,17 @@ int CServer::WriteData(PortState portState, int size)
 
 CServer::~CServer()
 {
-	cout << "Close portData\n";
-	for(auto hndlr : portData){
+	cout << "Close channelData\n";
+	for(auto hndlr : channelData){
+		delete hndlr.Interface;
 		cout << "Closing port " << hndlr.handler << "...\n";
 		tcsetattr(hndlr.handler, TCSANOW, &savedOptions);
 		ioctl(hndlr.handler, TIOCNXCL);
 		close(hndlr.handler);
 		close(hndlr.file);
 	}
+	
+	channelData.clear();
 	
 	cout << "Done\n";
 }

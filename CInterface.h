@@ -12,11 +12,11 @@ using namespace std;
 class CInterface
 {
 public:
-	virtual int ReturnPort() {};
+	virtual int ReturnPort() {return 0;};
 	
 	virtual int doWrite(const void *buf, size_t nbyte) {return 0;};
 	virtual int doRead(void *buf, size_t nbyte) {return 0;};
-	virtual int OpenPort(string port){};
+	virtual int OpenPort(string port){return 0;};
 	virtual void ClosePort() {};
 	
 	virtual ~CInterface() = 0;

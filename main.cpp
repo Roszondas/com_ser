@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	
 	if(isServer){
 		try{
-			Server = new CServer(pathStorage);
+			Server = new CServer(pathStorage, INTRFCE_COM);
 		}
 		catch(int err){
 			cerr << "Error " << err << ". Exit.\n";
