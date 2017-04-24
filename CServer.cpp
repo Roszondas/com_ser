@@ -1,7 +1,5 @@
 #include "CServer.h"
 #include <iostream>
-#include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <string.h>
@@ -34,16 +32,16 @@ CServer::CServer(vector <string> portAdresses, int protocol)
 
 int CServer::Start()
 {
-	int errFlag = 0;
+	int errFlag = 1;
 
-	while(!errFlag){
+	while(errFlag){
 		for(auto &hndlr : channelData){
 			actualChannel = &hndlr;
 			switch(hndlr.status){
 				case READING:	errFlag = RecieveData();
 				case WAITING:
 				case HNDSHAKED:	
-				default:		errFlag = CheckReady(hndlr);
+				default:		errFlag = CheckReady();
 			}
 		}
 	}
@@ -52,108 +50,97 @@ int CServer::Start()
 }
 
 
-int CServer::CheckReady(ChannelState &channelState)
+int CServer::CheckReady()
 {
 	char buf[sizeof(COM_HNDSHAKE)];
 	
-	cout << "Scan port " << channelState.handler << endl;
+	//cout << "Scan port " << actualChannel->handler << endl;
 
-	int len = read(channelState.handler, buf, sizeof(buf));
+	int len = Read(buf, sizeof(buf));
 	
-	if(len < 0)
+	if(len < 0){
 		cerr << "Handshake recieve error.\n";
+		return 0;
+	}
 
 	if(len > 0 && !strcmp(buf, COM_HNDSHAKE)){
 		len = 0;
-		cout << "Port " << channelState.handler << " recieved handshake. Waiting for confirmation.\n";
 		
-		len = write(channelState.handler, COM_HNDSHAKE, sizeof(COM_HNDSHAKE));
-		if (len != sizeof(COM_HNDSHAKE)) {
+		cout << "Port " << actualChannel->handler << " recieved handshake. Waiting for confirmation.\n";
+		
+		len = Write(COM_HNDSHAKE, sizeof(buf));
+		if (len < 0) {
 			cerr << "Writing confirm ready failed\n";
+			return 0;
 		}
 	
 		len = 0;
-	
 		memset(buf, 0, sizeof(buf));
+		
 		for(int i = 0; i < TIMEOUT; i++){
-			len = read(channelState.handler, buf, sizeof(buf));
+			len = Read(buf, sizeof(buf));
 			
 			if (len > 0)
 				break;
-			else if (len < 0)
+			else if (len < 0){
 				cerr << "Confirmation recieve error\n";
-		}
-		cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
-		if(len > 0 && !strcmp(buf, COM_READY)){
-			len = write(channelState.handler, COM_READY, sizeof(COM_READY));
-			if (len != sizeof(COM_READY)) {
-				cerr << "Writing ready signal failed\n";
+				return 0;
 			}
-			channelState.status = READING;
-			cout << "Confirmation recieved. Ready to write data. Status " << channelState.status << endl;
+		}
+		
+		cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
+		
+		if(len > 0 && !strcmp(buf, COM_READY)){
+			len = Write(COM_READY, sizeof(COM_READY));
+			if (len < 0) {
+				cerr << "Writing ready signal failed\n";
+				return 0;
+			}
+			
+			actualChannel->status = READING;
+			cout << "Confirmation recieved. Ready to write data. Status " << actualChannel->status << endl;
 		}
 	}
 	
-	return 0;
+	return 1;
 }
 
 
 int CServer::RecieveData()
 {
-	ChannelState *channelState = actualChannel;
-	
 	char buf[sizeof(int) + 1];
 	memset(buf, 0, sizeof(buf));
 	int err = 0;
 	
-	cout << "Waiting data " << channelState->handler << endl;
+	cout << "Waiting data " << actualChannel->handler << endl;
 	
 	int len = 0;
-	
+		
 	while(len < sizeof(buf)){
-		len += read(channelState->handler, buf, sizeof(buf));
-		if (len < 0){
+		err = Read(buf, sizeof(buf));
+		if (err < 0){
 			cerr << "Recieving size error\n";
-			err = errno;
-			return err;
+			return 0;
 		}
+		
+		len += err;
 	}
 	
 	cout << "buf = " << buf << endl;
 	int msgSize = atoi(buf);
 	cout << "Ready to recieve " << msgSize << " bytes\n";
 	
-	channelState->file = GetFileDescriptor();
+	err = WriteData(msgSize);
+	actualChannel->CloseFile();
+	actualChannel->status = WAITING;
 	
-	if(channelState->file == -1){
-		cout << "File creation failed\n";
-		err = errno;
-	}
-	else{
-		err = WriteData(*channelState, msgSize);
-		close(channelState->file);
-		channelState->status = WAITING;
-	}
+	cout << "Data recieved and saved\n\n";
 	
 	return err;
 }
 
 
-int CServer::GetFileDescriptor()
-{
-	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
-
-	char name[255];
-	sprintf(name, "%d-%d-%d_%d-%d-%d.hex", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-	
-	int fd = open(name, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
-
-	return fd;
-}
-
-
-int CServer::WriteData(ChannelState channelState, int size)
+int CServer::WriteData(int size)
 {
 	//char *buf = new char[size];
 	char buf;
@@ -162,25 +149,49 @@ int CServer::WriteData(ChannelState channelState, int size)
 	
 	cout << "Reading data.\n";
 	while(len < size){
-		len += read(channelState.handler, &buf, 1);
-		if (len < 0){
+		err = Read(&buf, 1);
+		if (err < 0){
 			cerr << "Recieving data error\n";
-			err = errno;
-			return err;
+			return 0;
 		}
-	
+		
+		len += err;
+
 		//cout << "Read " << len << " bytes\n";
 		//cout << "Data: " << buf << endl;
 	
-		int wlen = write(channelState.file, &buf, 1);
+		int wlen = WriteFile(&buf, 1);
 		if (wlen < 0){
 			cerr << "Writting data error\n";
-			err = errno;
-			return err;
+			return 0;
 		}
 	}
 	
-	return err;
+	return 1;
+}
+
+
+int CServer::Write(const void *buf, size_t nbyte)
+{
+	return actualChannel->Interface->doWrite(buf, nbyte);
+}
+
+
+int CServer::Read(void *buf, size_t nbyte)
+{
+	return actualChannel->Interface->doRead(buf, nbyte);
+}
+
+
+int CServer::WriteFile(const void *buf, size_t nbyte)
+{
+	return write(actualChannel->GetFileDescriptor(), buf, nbyte);
+}
+
+
+int CServer::ReadFile(void *buf, size_t nbyte)
+{
+	return read(actualChannel->GetFileDescriptor(), buf, nbyte);
 }
 
 
@@ -188,12 +199,8 @@ CServer::~CServer()
 {
 	cout << "Close channelData\n";
 	for(auto hndlr : channelData){
+		hndlr.CloseFile();
 		delete hndlr.Interface;
-		cout << "Closing port " << hndlr.handler << "...\n";
-		tcsetattr(hndlr.handler, TCSANOW, &savedOptions);
-		ioctl(hndlr.handler, TIOCNXCL);
-		close(hndlr.handler);
-		close(hndlr.file);
 	}
 	
 	channelData.clear();

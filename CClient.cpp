@@ -14,7 +14,7 @@
 
 using namespace std;
 
-vector <string> portList {"/dev/pts/5", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
+vector <string> portList {"/dev/pts/5", "/dev/pts/3", "/dev/pts/2", "/dev/pts/4"};
 //vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
 
 

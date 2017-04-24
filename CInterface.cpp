@@ -16,7 +16,7 @@
 #include <sys/types.h>
 #include <vector>
 
-vector <string> portListInterface {"/dev/pts/5", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
+vector <string> portListInterface {"/dev/pts/5", "/dev/pts/3", "/dev/pts/2", "/dev/pts/4"};
 
 CInterface::~CInterface() {};
 
