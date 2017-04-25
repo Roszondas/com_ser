@@ -66,6 +66,8 @@ int CComInterface::OpenPort(string port)
 	// int flags = fcntl(portHandler, F_GETFL, 0);
 	// fcntl(portHandler, F_SETFL, flags | O_NONBLOCK);
 	
+	tcflush(portHandler, TCIOFLUSH);
+	
 	cout << "successful.\n";
 	
 	portName = port;

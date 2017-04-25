@@ -33,7 +33,6 @@ private:
 	string portName = "";
 
 public:
-	int ReturnPort() {return portHandler;};	// temporary here
 	string GetPortName() {return portName;};
 	
 	CComInterface() {};

@@ -13,22 +13,24 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 using namespace std;
 
 struct ChannelState
 {
-	int handler;
 	string portName;
 	int status;
 	int file = -1;
+	char buffer[sizeof(COM_END)];
+	int dataLen = 0;
 	CInterface* Interface;
 	
 	ChannelState(CInterface* Interface, int status){
 		this->Interface = Interface;
 		this->status = status;
-		handler = Interface->ReturnPort();	//temporary
 		portName = Interface->GetPortName();
+		memset(buffer, '\0', sizeof(buffer));
 	}
 	
 	int GetFileDescriptor(){
@@ -63,9 +65,9 @@ private:
 	ChannelState* actualChannel;
 	struct termios savedOptions;
 	
+	int WaitHandshake();
 	int CheckReady();
 	int RecieveData();
-	int WriteData(int size);
 	
 	int Write(const void *buf, size_t nbyte);
 	int Read(void *buf, size_t nbyte);

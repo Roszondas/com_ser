@@ -19,6 +19,7 @@ private:
 	int portHandler = -1;
 	int fileHandler = -1;
 	string filePath;
+	string portName;
 	struct termios savedOptions;
 	CInterface *Interface = nullptr;
 	

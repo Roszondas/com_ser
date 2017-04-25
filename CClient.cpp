@@ -48,7 +48,7 @@ bool CClient::isFileExist(string filePath)
 int CClient::Start()
 {
 	if(FindServer())
-		portHandler = Interface->ReturnPort();
+		portName = Interface->GetPortName();
 	else
 		return ENXIO;
 	
@@ -106,7 +106,7 @@ int CClient::TryHandshake()
 
 int CClient::SendReady()
 {
-	cout << "SendReady " << portHandler << endl;
+	cout << "SendReady " << portName << endl;
 	
 	int len = Write(COM_READY, sizeof(COM_READY));
     if (len != sizeof(COM_READY)) {
@@ -152,11 +152,11 @@ int CClient::SendData()
 	
 	cout << "Sending " << strLen << " bytes\n";
 	
-	len = Write(buf, sizeof(buf));
-	if(len < 0)
-		return 0;
+	// len = Write(buf, sizeof(buf));
+	// if(len < 0)
+		// return 0;
 	
-	cout << "Sent " << len << " bytes as size\n";
+	// cout << "Sent " << len << " bytes as size\n";
 	
 	len = 0;
 	while(ReadFile(name, 1) > 0){
@@ -165,6 +165,11 @@ int CClient::SendData()
 	
 	cout << "Sent " << len << " bytes of data\n";
 
+	len = Write(COM_END, sizeof(COM_END));
+    if (len != sizeof(COM_END)) {
+		cerr << "Writing failed\n";
+    }
+	
 	return 1;
 }
 
