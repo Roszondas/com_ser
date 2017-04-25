@@ -1,4 +1,5 @@
-#define	TIMEOUT			1
+#define	END_TIMEOUT		10
+#define	TIMEOUT			5
 
 #define COM_HNDSHAKE	"787"
 #define COM_READY		"325"

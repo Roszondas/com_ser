@@ -15,9 +15,9 @@
 using namespace std;
 
 //vector <string> portList {"/dev/pts/0", "/dev/pts/1", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
-//vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
+vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
 
-vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3", "/dev/pts/3", "/dev/pts/4"};
+//vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3", "/dev/pts/3", "/dev/pts/4"};
 
 
 CClient::CClient(string filePath, int protocol)
@@ -143,10 +143,11 @@ int CClient::WaitReady()
 
 int CClient::SendData()
 {
-	char name[255];
+	char name;//[255];
 	char buf[sizeof(int) + 1];
 	int strLen = FileSize();
 	int len = 0;
+	int err = 0;
 	
 	sprintf(buf, "%i", strLen);
 	
@@ -159,8 +160,10 @@ int CClient::SendData()
 	// cout << "Sent " << len << " bytes as size\n";
 	
 	len = 0;
-	while(ReadFile(name, 1) > 0){
-		len += Write(name, 1);
+	while(ReadFile(&name, 1) > 0){
+		err = Write(&name, 1);
+		//cout << name << " " << err << "\n";
+		len += err;
 	}
 	
 	cout << "Sent " << len << " bytes of data\n";

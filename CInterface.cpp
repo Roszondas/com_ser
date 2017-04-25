@@ -16,8 +16,6 @@
 #include <sys/types.h>
 #include <vector>
 
-vector <string> portListInterface {"/dev/pts/5", "/dev/pts/3", "/dev/pts/2", "/dev/pts/4"};
-
 CInterface::~CInterface() {};
 
 
@@ -54,7 +52,7 @@ int CComInterface::OpenPort(string port)
 	options.c_iflag &= ~IGNBRK;
 	options.c_lflag &= ~(ICANON);
 	options.c_cc[VMIN]  = 0;
-	options.c_cc[VTIME] = 5;
+	options.c_cc[VTIME] = 1;
 	
 	if( tcsetattr(portHandler, TCSANOW, &options) != 0){
 		cerr << "failed.\nError writing port options\n";

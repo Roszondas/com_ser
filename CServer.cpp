@@ -64,7 +64,7 @@ int CServer::WaitHandshake()
 	char buf[size];
 	memset(buf, '\0', size);
 	
-	cout << "Scan port " << actualChannel->portName << endl;
+	//cout << "Scan port " << actualChannel->portName << endl;
 
 	int len = Read(buf, size);
 	if(len < 0){
@@ -97,21 +97,19 @@ int CServer::CheckReady()
 	char buf[size];
 	memset(buf, '\0', size);
 	
-	cout << "Wait confirmation from " << actualChannel->portName << endl;
+	//cout << "Wait confirmation from " << actualChannel->portName << endl;
 
 	int len = 0;
 	memset(buf, 0, sizeof(buf));
 	
-	for(int i = 0; i < TIMEOUT; i++){
-		len = Read(buf, sizeof(buf));
-		
-		if (len > 0)
-			break;
-		else if (len < 0){
-			cerr << "Confirmation recieve error\n";
-			return 0;
-		}
+
+	len = Read(buf, sizeof(buf));
+	
+	if (len < 0){
+		cerr << "Confirmation recieve error\n";
+		return 0;
 	}
+
 	
 	//cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
 	
@@ -134,46 +132,58 @@ int CServer::RecieveData()
 {
 	int err = 0;
 	
-	cout << "Waiting data from " << actualChannel->portName << endl;
+	//cout << "Waiting data from " << actualChannel->portName << endl;
 
 	char *dataBuf = actualChannel->buffer;
 	char signalBuf[sizeof(COM_END)];
 	memset(signalBuf, '\0', sizeof(dataBuf));
 
-	err = Read(&dataBuf[sizeof(dataBuf) - 1], 1);
+	int tm = 0;
 	
-	if (err < 0){
-		cerr << "Recieving data error\n";
-		return 0;
-	}
-	else if(err == 0){
-		return 1;
-	}
-	else {
-		actualChannel->dataLen += err;
-		for(int i = 0; i < sizeof(dataBuf) - 1; i++){
-			dataBuf[i] = dataBuf[i+1];
-			signalBuf[i] = dataBuf[i];
-		}
-	}
+	while (tm < END_TIMEOUT){
+		err = Read(&dataBuf[sizeof(dataBuf) - 1], 1);
 		
-	
-	if(!strcmp(signalBuf, COM_END)){
-		actualChannel->CloseFile();
-		actualChannel->status = WAITING;
-		actualChannel->dataLen = 0;
-		cout << "Data recieved and saved\n\n";
-		return 1;
-	}
-	else if(actualChannel->dataLen > sizeof(COM_END) - 2) {
-		err = WriteFile(&dataBuf[0], 1);
 		if (err < 0){
-			cerr << "Writting data error\n";
+			cerr << "Recieving data error\n";
 			return 0;
 		}
+		else if(err == 0){
+			tm++;
+			continue;
+			//return 1;
+		}
+		else {
+			actualChannel->dataLen += err;
+			for(int i = 0; i < sizeof(dataBuf) - 1; i++){
+				dataBuf[i] = dataBuf[i+1];
+				signalBuf[i] = dataBuf[i];
+			}
+		}
+			
+		
+		if(!strcmp(signalBuf, COM_END)){
+			actualChannel->CloseFile();
+			actualChannel->status = WAITING;
+			actualChannel->dataLen = 0;
+			cout << "Data recieved and saved\n\n";
+			return 1;
+		}
+		else if(actualChannel->dataLen > sizeof(COM_END) - 2) {
+			err = WriteFile(&dataBuf[0], 1);
+			//cout << dataBuf[0] << " " << err << "\n";
+			if (err < 0){
+				cerr << "Writting data error\n";
+				return 0;
+			}
+		}
 	}
-
-	return err;
+	
+	actualChannel->CloseFile();
+	actualChannel->status = WAITING;
+	actualChannel->dataLen = 0;
+	cout << "Transmission timed out\n\n";
+	
+	return 1;
 }
 
 

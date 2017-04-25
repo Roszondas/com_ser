@@ -41,9 +41,16 @@ struct ChannelState
 		struct tm tm = *localtime(&t);
 
 		char name[255];
+		int addNum = 0;
 		sprintf(name, "%d-%d-%d_%d-%d-%d.hex", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 		
-		file = open(name, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+		file = open(name, O_RDONLY);
+		while(file != -1){
+			sprintf(name, "%d-%d-%d_%d-%d-%d_(%d).hex", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ++addNum);
+			file = open(name, O_RDONLY);
+		}
+		
+		file = open(name, O_WRONLY | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
 
 		return file;
 	}
