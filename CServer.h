@@ -19,6 +19,7 @@ using namespace std;
 struct ChannelState
 {
 	int handler;
+	string portName;
 	int status;
 	int file = -1;
 	CInterface* Interface;
@@ -27,6 +28,7 @@ struct ChannelState
 		this->Interface = Interface;
 		this->status = status;
 		handler = Interface->ReturnPort();	//temporary
+		portName = Interface->GetPortName();
 	}
 	
 	int GetFileDescriptor(){

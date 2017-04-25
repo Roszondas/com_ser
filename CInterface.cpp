@@ -25,15 +25,17 @@ int CComInterface::OpenPort(string port)
 {
 	ClosePort();
 	
+	cout << "\nPort " << port << " opening ";
+	
 	portHandler = open(port.c_str(), O_RDWR | O_NOCTTY );
 
 	if (portHandler == -1) {
-		cerr << "Error opening port " << port << endl;
+		cerr << "failed.\nError opening port " << port << endl;
 		return 0;
 	}
 	
 	if (ioctl(portHandler, TIOCEXCL)) {
-		cerr << "Port is busy\n";
+		cerr << "failed.\nPort is busy\n";
 		close (portHandler);
 		return 0;
 	}
@@ -50,18 +52,23 @@ int CComInterface::OpenPort(string port)
 	options.c_cflag &= ~(PARENB | PARODD);
 	options.c_cflag |= (CLOCAL | CREAD);
 	options.c_iflag &= ~IGNBRK;
-	options.c_iflag &= ~O_NONBLOCK ;
+	options.c_lflag &= ~(ICANON);
 	options.c_cc[VMIN]  = 0;
 	options.c_cc[VTIME] = 5;
 	
 	if( tcsetattr(portHandler, TCSANOW, &options) != 0){
-		cerr << "Error writing port options\n";
+		cerr << "failed.\nError writing port options\n";
 		ioctl(portHandler, TIOCNXCL);
 		close (portHandler);
 		return 0;
 	}
 	
-	cout << "Port open: " << portHandler << " " << port << endl;
+	// int flags = fcntl(portHandler, F_GETFL, 0);
+	// fcntl(portHandler, F_SETFL, flags | O_NONBLOCK);
+	
+	cout << "successful.\n";
+	
+	portName = port;
 	
 	return 1;
 }
@@ -69,6 +76,7 @@ int CComInterface::OpenPort(string port)
 
 void CComInterface::ClosePort(){
 	if(portHandler < 0) return;
+	cout << "Closing port\n";
 	errno = 0;
 	tcsetattr(portHandler, TCSANOW, &savedOptions);
 	ioctl(portHandler, TIOCNXCL);
@@ -82,7 +90,7 @@ int CComInterface::doWrite(const void *buf, size_t nbyte)
 	int len = write(portHandler, buf, nbyte);
 	if (len < 0) {
 		cerr << "Write error.\n";
-		return 0;
+		//return 0;
 	}
 	//cout << "Actual len " << len << endl;
 	return len;
@@ -93,9 +101,10 @@ int CComInterface::doRead(void *buf, size_t nbyte)
 {
 	//cout << "Read from " << portHandler << " Len " << nbyte << endl;
 	int len = read(portHandler, buf, nbyte);
+
 	if (len < 0) {
 		cerr << "Read error.\n";
-		return 0;
+		//return 0;
 	}
 	
 	//cout << "Actual len " << len << endl;
@@ -105,10 +114,11 @@ int CComInterface::doRead(void *buf, size_t nbyte)
 
 CComInterface::~CComInterface()
 {
-	cout << "Closing port " << portHandler << "...\n";
 	if(portHandler != -1){
+		cout << "Closing port: " << portName << endl;
 		tcsetattr(portHandler, TCSANOW, &savedOptions);
 		ioctl(portHandler, TIOCNXCL);
 		close (portHandler);
+		portName = "";
 	}
 }

@@ -14,8 +14,10 @@
 
 using namespace std;
 
-vector <string> portList {"/dev/pts/5", "/dev/pts/3", "/dev/pts/2", "/dev/pts/4"};
+//vector <string> portList {"/dev/pts/0", "/dev/pts/1", "/dev/pts/2", "/dev/pts/3", "/dev/pts/4"};
 //vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3"};
+
+vector <string> portList {"/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3", "/dev/pts/3", "/dev/pts/4"};
 
 
 CClient::CClient(string filePath, int protocol)
@@ -48,13 +50,16 @@ int CClient::Start()
 	if(FindServer())
 		portHandler = Interface->ReturnPort();
 	else
-		return -1;
+		return ENXIO;
 	
 	SendReady();
 	if(!WaitReady())
 		return ENOMSG;
 	
-	return SendData();
+	if(!SendData())
+		return ECOMM;
+	else
+		return 0;
 }
 
 
@@ -64,6 +69,9 @@ int CClient::FindServer()
 		if(Interface->OpenPort(portList[index])){
 			if(TryHandshake())
 				return 1;
+			else{
+				cerr << "Server not found on this channel\n";
+			}
 		}
 	}
 	
@@ -75,15 +83,18 @@ int CClient::TryHandshake()
 {
 	int size = sizeof(COM_HNDSHAKE);
 	char buf[size];
-		
-	Write(COM_HNDSHAKE, size);
+	
+	if(Write(COM_HNDSHAKE, size) < 0)
+		return 0;
 
 	for(int i = 0; i < TIMEOUT; i++){
 		cout << "Scaning\n";
 		if(Read(buf, size))
 			break;
 	}
-
+	
+	//cerr << size << " Get " << buf << " wait " << COM_HNDSHAKE << "\n " << strcmp(buf, COM_HNDSHAKE) << endl;
+	
 	errno = 0;
 	
 	if(!strcmp(buf, COM_HNDSHAKE))
@@ -142,6 +153,9 @@ int CClient::SendData()
 	cout << "Sending " << strLen << " bytes\n";
 	
 	len = Write(buf, sizeof(buf));
+	if(len < 0)
+		return 0;
+	
 	cout << "Sent " << len << " bytes as size\n";
 	
 	len = 0;
@@ -186,7 +200,8 @@ int CClient::FileSize()
 	cout << "Checking input file size.\n";
 	
 	char rd;
-	while(read(fileHandler, &rd, 1) > 0){
+	while(ReadFile(&rd, 1) > 0){
+		//cout << strLen << endl;
 		strLen++;
 	}
 	
@@ -199,7 +214,7 @@ int CClient::FileSize()
 CClient::~CClient()
 {
 	if(fileHandler != -1) {
-		cout << "Closing file " << fileHandler << "...\n";
+		cout << "Closing file: " << filePath << endl;
 		close (fileHandler);
 	}
 	
@@ -207,5 +222,5 @@ CClient::~CClient()
 		delete Interface;
 	}
 	
-	cout << "Done\n";
+	cout << "\nDone\n";
 }

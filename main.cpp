@@ -22,7 +22,7 @@ CClient *Client = nullptr;
 CServer *Server = nullptr;
 
 void sigHandler(int s){
-   printf("\nCaught signal %d\n",s);
+   printf("\n\nExit by user signal\n\n");
    
 	if(Client != nullptr)
 		delete Client;
@@ -92,34 +92,40 @@ int main(int argc, char **argv)
 		try{
 			Server = new CServer(pathStorage, INTRFCE_COM);
 		}
-		catch(int err){
-			cerr << "Error " << err << ". Exit.\n";
+		catch(int error){
+			err = error;
+
 			if(Server != nullptr)
 				delete Server;
-			exit(err);
+			
+			Server = nullptr;
 		}
 		
-		err = Server->Start();
+		if(Server != nullptr)
+			err = Server->Start();
 	}
 	else if(isClient){
 		
 		try{
 			Client = new CClient(pathStorage[0], INTRFCE_COM);
 		}
-		catch(int err){
-			cerr << "Error " << err << ". Exit.\n";
+		catch(int error){
+			err = error;
+
 			if(Client != nullptr)
 				delete Client;
-			exit(err);
+			
+			Client = nullptr;
 		}
 		
-		err = Client->Start();
+		if(Client != nullptr)
+			err = Client->Start();
 	}
 	else {
 		Usage(argv[0]);
 	}
 	
-	cout << "Bye!\n";
+	cout << "\nBye!\n\n";
 	
 	if(Client != nullptr)
 		delete Client;
@@ -127,7 +133,7 @@ int main(int argc, char **argv)
 	if(Server != nullptr)
 		delete Server;
 	
-	cerr << err << endl;
-	cerr << errno << endl;
+	cerr << "Exit status	: " << strerror(errno) << endl;
+	cerr << "Additional code : " << strerror(err) << endl;
 	return err;
 }

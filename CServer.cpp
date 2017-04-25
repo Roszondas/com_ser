@@ -27,6 +27,8 @@ CServer::CServer(vector <string> portAdresses, int protocol)
 		cerr << "There is no working port\n";
 		throw ENXIO;
 	}
+	
+	cout << "\n";
 }
 
 
@@ -52,21 +54,23 @@ int CServer::Start()
 
 int CServer::CheckReady()
 {
-	char buf[sizeof(COM_HNDSHAKE)];
+	int size = sizeof(COM_HNDSHAKE);
+	char buf[size];
+	memset(buf, '\0', size);
 	
 	//cout << "Scan port " << actualChannel->handler << endl;
 
-	int len = Read(buf, sizeof(buf));
-	
+	int len = Read(buf, size);
 	if(len < 0){
 		cerr << "Handshake recieve error.\n";
-		return 0;
 	}
 
-	if(len > 0 && !strcmp(buf, COM_HNDSHAKE)){
+	//cerr << "Len " << len << " Get " << buf << " wait " << COM_HNDSHAKE "\n " << strcmp(buf, COM_HNDSHAKE) << endl;
+	
+	if(!strcmp(buf, COM_HNDSHAKE)){
 		len = 0;
 		
-		cout << "Port " << actualChannel->handler << " recieved handshake. Waiting for confirmation.\n";
+		cout << "Port " << actualChannel->portName << " recieved handshake. Waiting for confirmation.\n";
 		
 		len = Write(COM_HNDSHAKE, sizeof(buf));
 		if (len < 0) {
@@ -88,7 +92,7 @@ int CServer::CheckReady()
 			}
 		}
 		
-		cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
+		//cerr << "Len " << len << " Get " << buf << " wait " << COM_READY << endl;
 		
 		if(len > 0 && !strcmp(buf, COM_READY)){
 			len = Write(COM_READY, sizeof(COM_READY));
@@ -197,7 +201,7 @@ int CServer::ReadFile(void *buf, size_t nbyte)
 
 CServer::~CServer()
 {
-	cout << "Close channelData\n";
+	//cout << "Close channelData\n";
 	for(auto hndlr : channelData){
 		hndlr.CloseFile();
 		delete hndlr.Interface;
@@ -205,5 +209,5 @@ CServer::~CServer()
 	
 	channelData.clear();
 	
-	cout << "Done\n";
+	cout << "\nDone\n";
 }
